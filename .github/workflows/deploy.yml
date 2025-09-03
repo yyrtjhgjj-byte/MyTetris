@@ -1,25 +1,23 @@
 name: Deploy Tetris Web App
-
 on:
   push:
     branches: [ main ]
-
 jobs:
   build:
     runs-on: ubuntu-22.04
-
     steps:
     - uses: actions/checkout@v3
-
     - name: Setup SwiftWasm
       uses: swiftwasm/setup-swiftwasm@v1
       with:
-        # ↓↓↓ Swiftのバージョンを5.9.2に更新しました！ ↓↓↓
         swift-version: 'wasm-5.9.2-RELEASE'
-
+        
+    # ▼▼▼ この2行をここに追加 ▼▼▼
+    - name: Install Carton
+      run: swift run swiftwasm/carton
+      
     - name: Build with Carton
       run: carton bundle
-
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
       with:
