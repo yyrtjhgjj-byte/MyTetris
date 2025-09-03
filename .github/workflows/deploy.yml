@@ -11,13 +11,11 @@ jobs:
       uses: swiftwasm/setup-swiftwasm@v1
       with:
         swift-version: 'wasm-5.9.2-RELEASE'
-        
-    # ▼▼▼ この2行をここに追加 ▼▼▼
-    - name: Install Carton
-      run: swift run swiftwasm/carton
-      
+
+    # ▼▼▼ 以前の2ステップを、この1ステップに置き換える ▼▼▼
     - name: Build with Carton
-      run: carton bundle
+      run: swift run carton bundle
+      
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
       with:
