@@ -1,4 +1,4 @@
-import SwiftUI
+import TokamakShim
 
 // テトリミノの基本となる構造体（データの箱）
 struct Tetrimino {
