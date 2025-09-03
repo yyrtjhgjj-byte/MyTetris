@@ -6,7 +6,7 @@ on:
 
 jobs:
   build:
-    # ↓↓↓ OSのバージョンを ubuntu-22.04 に固定します！ ↓↓↓
+    # 念のためOSは安定版に固定
     runs-on: ubuntu-22.04
 
     steps:
@@ -15,7 +15,8 @@ jobs:
     - name: Setup SwiftWasm
       uses: swiftwasm/setup-swiftwasm@v1
       with:
-        swift-version: 'wasm-5.6.0-RELEASE'
+        # ↓↓↓ Swiftのバージョンを5.7.1に更新！ ↓↓↓
+        swift-version: 'wasm-5.7.1-RELEASE'
 
     - name: Build with Carton
       run: carton bundle
