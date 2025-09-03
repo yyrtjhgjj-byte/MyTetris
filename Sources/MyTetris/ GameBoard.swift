@@ -1,4 +1,4 @@
-import SwiftUI
+import TokamakShim
 
 // マス（セル）の種類を定義します
 // enum（イーナム）は「いくつかの種類の中から一つを選ぶ」形式のデータを定義するときに便利です
