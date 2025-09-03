@@ -1,46 +1,52 @@
 import TokamakShim
+// JavaScriptの機能を呼び出すために必要
+import JavaScriptKit
 
-// Color.cyan など一部の色はTokamakにないので、ここで定義
 extension Color {
-    static let cyan = Color.blue
+    static let cyan = Color(red: 0.0, green: 1.0, blue: 1.0)
     static let purple = Color(red: 0.5, green: 0, blue: 0.5)
 }
 
-// Timerを管理しやすくするためのPublisher
-let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+// Timerの代わりに使う変数を定義
+var timer: JSValue? = nil
 
 struct ContentView: View {
-    // --- State Properties ---
     @State private var gameBoard = GameBoard()
     @State private var score = 0
     @State private var level = 1
-    
-    // --- 簡略化のため、一旦多くのStateをコメントアウト ---
     @State private var currentTetrimino: Tetrimino?
     @State private var tetriminoPosition = Position(col: 4, row: 0)
-    //@State private var timer: Timer? // TokamakのTimerに置き換え
     @State private var isGameOver = false
-    @State private var totalLinesCleared = 0
     @StateObject private var tetriminoFactory = TetriminoFactory()
-    @State private var heldTetrimino: Tetrimino?
-    @State private var hasHeldInTurn = false
-    
-    // --- Constants ---
-    let cellSize: CGFloat = 18
+
+    // CGFloatをDoubleに修正
+    let cellSize: Double = 18
     
     var body: some View {
         VStack {
             scoreHeader
             gameBoardView
         }
-        .onAppear(perform: startGame)
-        // TokamakのTimerで自動落下を処理
-        .onReceive(timer) { _ in
-            moveTetriminoDown()
-        }
+        .onAppear(perform: setupTimer) // .onReceiveの代わりに.onAppearと.onDisappearを使う
+        .onDisappear(perform: clearTimer)
     }
     
-    // MARK: - View Components
+    // Webブラウザのタイマー機能をセットアップする関数
+    func setupTimer() {
+        startGame()
+        // 1000ミリ秒（1秒）ごとに moveTetriminoDown を呼び出す
+        timer = JSObject.global.setInterval.function?(
+            JSClosure { _ in
+                moveTetriminoDown()
+                return .undefined
+            }, 1000)
+    }
+    
+    // タイマーを停止する関数
+    func clearTimer() {
+        guard let timer = timer else { return }
+        _ = JSObject.global.clearInterval.function?(timer)
+    }
     
     var scoreHeader: some View {
         HStack {
@@ -61,11 +67,25 @@ struct ContentView: View {
                     }
                 }
             }
+            
+            if let tetrimino = currentTetrimino {
+                ForEach(0..<tetrimino.currentShape.count, id: \.self) { index in
+                    let block = tetrimino.currentShape[index]
+                    Rectangle()
+                        .frame(width: cellSize, height: cellSize)
+                        .foregroundColor(tetrimino.color)
+                        .position(
+                            // CGFloatをDoubleにキャスト変換
+                            x: (Double(tetriminoPosition.col + block.col) + 0.5) * (cellSize + 1),
+                            y: (Double(tetriminoPosition.row + block.row) + 0.5) * (cellSize + 1)
+                        )
+                }
+            }
         }
+        // CGFloatをDoubleにキャスト変換
+        .frame(width: Double(gameBoard.columns) * (cellSize + 1), height: Double(gameBoard.rows) * (cellSize + 1))
         .background(Color.black)
     }
-    
-    // MARK: - Game Logic
     
     func startGame() {
         gameBoard = GameBoard()
