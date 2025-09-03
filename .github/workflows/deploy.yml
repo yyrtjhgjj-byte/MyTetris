@@ -14,8 +14,8 @@ jobs:
     - name: Setup SwiftWasm
       uses: swiftwasm/setup-swiftwasm@v1
       with:
-        # ↓↓↓ Swiftのバージョンを5.9.0に更新しました！ ↓↓↓
-        swift-version: 'wasm-5.9.0-RELEASE'
+        # ↓↓↓ Swiftのバージョンを5.9.2に更新しました！ ↓↓↓
+        swift-version: 'wasm-5.9.2-RELEASE'
 
     - name: Build with Carton
       run: carton bundle
