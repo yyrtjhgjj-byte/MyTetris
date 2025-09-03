@@ -1,0 +1,31 @@
+name: Deploy Tetris Web App
+
+# mainブランチにコードが追加されたら自動で実行する
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # 仮想マシンとしてUbuntuを使う
+
+    steps:
+    # 1. あなたのリポジトリのコードを仮想マシンに持ってくる
+    - uses: actions/checkout@v3
+
+    # 2. Swift for WebAssemblyの開発環境を準備する
+    - name: Setup SwiftWasm
+      uses: swiftwasm/setup-swiftwasm@v1
+      with:
+        swift-version: '5.6' # Package.swiftで指定したバージョン
+
+    # 3. cartonというツールでSwiftコードをWebサイトのファイルに変換する
+    - name: Build with Carton
+      run: carton bundle
+
+    # 4. 完成したWebサイトのファイルを公開用ブランチ(gh-pages)にアップロードする
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./Bundle # cartonが生成したフォルダを指定
