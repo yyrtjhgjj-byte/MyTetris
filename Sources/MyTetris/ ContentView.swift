@@ -1,5 +1,4 @@
 import TokamakShim
-// JavaScriptの機能を呼び出すために必要
 import JavaScriptKit
 
 extension Color {
@@ -7,10 +6,10 @@ extension Color {
     static let purple = Color(red: 0.5, green: 0, blue: 0.5)
 }
 
-// Timerの代わりに使う変数を定義
-var timer: JSValue? = nil
-
 struct ContentView: View {
+    // ⬇️ timer変数をContentViewの中に移動させ、staticをつける
+    static var timer: JSValue? = nil
+    
     @State private var gameBoard = GameBoard()
     @State private var score = 0
     @State private var level = 1
@@ -19,7 +18,6 @@ struct ContentView: View {
     @State private var isGameOver = false
     @StateObject private var tetriminoFactory = TetriminoFactory()
 
-    // CGFloatをDoubleに修正
     let cellSize: Double = 18
     
     var body: some View {
@@ -27,24 +25,21 @@ struct ContentView: View {
             scoreHeader
             gameBoardView
         }
-        .onAppear(perform: setupTimer) // .onReceiveの代わりに.onAppearと.onDisappearを使う
+        .onAppear(perform: setupTimer)
         .onDisappear(perform: clearTimer)
     }
     
-    // Webブラウザのタイマー機能をセットアップする関数
     func setupTimer() {
         startGame()
-        // 1000ミリ秒（1秒）ごとに moveTetriminoDown を呼び出す
-        timer = JSObject.global.setInterval.function?(
+        ContentView.timer = JSObject.global.setInterval.function?(
             JSClosure { _ in
                 moveTetriminoDown()
                 return .undefined
             }, 1000)
     }
     
-    // タイマーを停止する関数
     func clearTimer() {
-        guard let timer = timer else { return }
+        guard let timer = ContentView.timer else { return }
         _ = JSObject.global.clearInterval.function?(timer)
     }
     
@@ -58,31 +53,35 @@ struct ContentView: View {
     }
 
     var gameBoardView: some View {
-        VStack(spacing: 1) {
-            ForEach(0..<gameBoard.rows, id: \.self) { row in
-                HStack(spacing: 1) {
-                    ForEach(0..<gameBoard.columns, id: \.self) { col in
-                        Rectangle().frame(width: cellSize, height: cellSize)
-                            .foregroundColor(colorForCell(cellType: gameBoard.grid[row][col]))
+        // ⬇️ ZStackを使って、背景の盤面とテトリミノを重ねる
+        ZStack {
+            // 背景のグリッド
+            VStack(spacing: 1) {
+                ForEach(0..<gameBoard.rows, id: \.self) { row in
+                    HStack(spacing: 1) {
+                        ForEach(0..<gameBoard.columns, id: \.self) { col in
+                            Rectangle().frame(width: cellSize, height: cellSize)
+                                .foregroundColor(colorForCell(cellType: gameBoard.grid[row][col]))
+                        }
                     }
                 }
             }
             
+            // 操作中のテトリミノ
             if let tetrimino = currentTetrimino {
                 ForEach(0..<tetrimino.currentShape.count, id: \.self) { index in
                     let block = tetrimino.currentShape[index]
                     Rectangle()
                         .frame(width: cellSize, height: cellSize)
                         .foregroundColor(tetrimino.color)
-                        .position(
-                            // CGFloatをDoubleにキャスト変換
-                            x: (Double(tetriminoPosition.col + block.col) + 0.5) * (cellSize + 1),
-                            y: (Double(tetriminoPosition.row + block.row) + 0.5) * (cellSize + 1)
+                        // ⬇️ .offsetを使って位置を調整する（.positionより確実）
+                        .offset(
+                            x: (Double(tetriminoPosition.col + block.col) - Double(gameBoard.columns - 1) / 2.0) * (cellSize + 1),
+                            y: (Double(tetriminoPosition.row + block.row) - Double(gameBoard.rows - 1) / 2.0) * (cellSize + 1)
                         )
                 }
             }
         }
-        // CGFloatをDoubleにキャスト変換
         .frame(width: Double(gameBoard.columns) * (cellSize + 1), height: Double(gameBoard.rows) * (cellSize + 1))
         .background(Color.black)
     }
