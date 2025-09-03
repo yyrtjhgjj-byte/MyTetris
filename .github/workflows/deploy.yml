@@ -6,7 +6,8 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # ↓↓↓ OSのバージョンを ubuntu-22.04 に固定します！ ↓↓↓
+    runs-on: ubuntu-22.04
 
     steps:
     - uses: actions/checkout@v3
@@ -14,7 +15,6 @@ jobs:
     - name: Setup SwiftWasm
       uses: swiftwasm/setup-swiftwasm@v1
       with:
-        # ↓↓↓ ここの書き方を修正しました！ ↓↓↓
         swift-version: 'wasm-5.6.0-RELEASE'
 
     - name: Build with Carton
