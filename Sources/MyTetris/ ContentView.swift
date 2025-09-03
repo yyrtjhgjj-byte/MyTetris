@@ -1,29 +1,7 @@
 import TokamakShim
 import JavaScriptKit
 
-// タイマーを専門に管理するクラス（ヘルパー）
-class GameTimer: ObservableObject {
-    var timer: JSValue? = nil
-
-    func start(action: @escaping () -> Void) {
-        stop() // 既存のタイマーがあれば停止
-        timer = JSObject.global.setInterval.function?(
-            JSClosure { _ in
-                action()
-                return .undefined
-            }, 1000)
-    }
-
-    func stop() {
-        if let timer = timer {
-            _ = JSObject.global.clearInterval.function?(timer)
-            self.timer = nil
-        }
-    }
-}
-
 struct ContentView: View {
-    // ⬇️ StateObjectを使って、タイマー管理者（ヘルパー）のインスタンスを作成
     @StateObject private var gameTimer = GameTimer()
     
     @State private var gameBoard = GameBoard()
@@ -41,7 +19,6 @@ struct ContentView: View {
             scoreHeader
             gameBoardView
         }
-        // ⬇️ .onAppearと.onDisappearでタイマー管理者に開始と停止を命令する
         .onAppear {
             startGame()
             gameTimer.start {
