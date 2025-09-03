@@ -2,14 +2,16 @@
 import PackageDescription
 
 let package = Package(
-    name: "MyTetris", // あなたのリポジトリ名に合わせて変えてもOK
-    platforms: [.macOS(.v12), .iOS(.v15)], // ネイティブ用の設定（今回は使わない）
+    name: "MyTetris",
+    platforms: [.macOS(.v12), .iOS(.v15)],
     dependencies: [
-        .package(url: "https://github.com/TokamakUI/Tokamak", from: "0.11.0")
+        .package(url: "https://github.com/TokamakUI/Tokamak", from: "0.11.0"),
+        // ▼▼▼ この行をここに追加 ▼▼▼
+        .package(url: "https://github.com/swiftwasm/carton", from: "1.0.0")
     ],
     targets: [
         .executableTarget(
-            name: "MyTetris", // 上のnameと同じ名前にする
+            name: "MyTetris",
             dependencies: [
                 .product(name: "TokamakShim", package: "Tokamak")
             ]),
