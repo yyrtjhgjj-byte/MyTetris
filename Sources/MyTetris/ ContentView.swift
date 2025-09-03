@@ -1,14 +1,30 @@
 import TokamakShim
 import JavaScriptKit
 
-extension Color {
-    static let cyan = Color(red: 0.0, green: 1.0, blue: 1.0)
-    static let purple = Color(red: 0.5, green: 0, blue: 0.5)
+// タイマーを専門に管理するクラス（ヘルパー）
+class GameTimer: ObservableObject {
+    var timer: JSValue? = nil
+
+    func start(action: @escaping () -> Void) {
+        stop() // 既存のタイマーがあれば停止
+        timer = JSObject.global.setInterval.function?(
+            JSClosure { _ in
+                action()
+                return .undefined
+            }, 1000)
+    }
+
+    func stop() {
+        if let timer = timer {
+            _ = JSObject.global.clearInterval.function?(timer)
+            self.timer = nil
+        }
+    }
 }
 
 struct ContentView: View {
-    // ⬇️ timer変数をContentViewの中に移動させ、staticをつける
-    static var timer: JSValue? = nil
+    // ⬇️ StateObjectを使って、タイマー管理者（ヘルパー）のインスタンスを作成
+    @StateObject private var gameTimer = GameTimer()
     
     @State private var gameBoard = GameBoard()
     @State private var score = 0
@@ -25,22 +41,16 @@ struct ContentView: View {
             scoreHeader
             gameBoardView
         }
-        .onAppear(perform: setupTimer)
-        .onDisappear(perform: clearTimer)
-    }
-    
-    func setupTimer() {
-        startGame()
-        ContentView.timer = JSObject.global.setInterval.function?(
-            JSClosure { _ in
+        // ⬇️ .onAppearと.onDisappearでタイマー管理者に開始と停止を命令する
+        .onAppear {
+            startGame()
+            gameTimer.start {
                 moveTetriminoDown()
-                return .undefined
-            }, 1000)
-    }
-    
-    func clearTimer() {
-        guard let timer = ContentView.timer else { return }
-        _ = JSObject.global.clearInterval.function?(timer)
+            }
+        }
+        .onDisappear {
+            gameTimer.stop()
+        }
     }
     
     var scoreHeader: some View {
@@ -53,9 +63,7 @@ struct ContentView: View {
     }
 
     var gameBoardView: some View {
-        // ⬇️ ZStackを使って、背景の盤面とテトリミノを重ねる
         ZStack {
-            // 背景のグリッド
             VStack(spacing: 1) {
                 ForEach(0..<gameBoard.rows, id: \.self) { row in
                     HStack(spacing: 1) {
@@ -67,14 +75,12 @@ struct ContentView: View {
                 }
             }
             
-            // 操作中のテトリミノ
             if let tetrimino = currentTetrimino {
                 ForEach(0..<tetrimino.currentShape.count, id: \.self) { index in
                     let block = tetrimino.currentShape[index]
                     Rectangle()
                         .frame(width: cellSize, height: cellSize)
                         .foregroundColor(tetrimino.color)
-                        // ⬇️ .offsetを使って位置を調整する（.positionより確実）
                         .offset(
                             x: (Double(tetriminoPosition.col + block.col) - Double(gameBoard.columns - 1) / 2.0) * (cellSize + 1),
                             y: (Double(tetriminoPosition.row + block.row) - Double(gameBoard.rows - 1) / 2.0) * (cellSize + 1)
