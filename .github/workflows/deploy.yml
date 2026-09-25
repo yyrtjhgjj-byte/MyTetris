@@ -2,22 +2,30 @@ name: Deploy Tetris Web App
 on:
   push:
     branches: [ main ]
-jobs:
-  build:
-    runs-on: ubuntu-22.04
-    steps:
-    - uses: actions/checkout@v3
-    - name: Setup SwiftWasm
-      uses: swiftwasm/setup-swiftwasm@v1
-      with:
-        swift-version: 'wasm-5.9.2-RELEASE'
+  workflow_dispatch:
 
-    # ▼▼▼ 以前の2ステップを、この1ステップに置き換える ▼▼▼
-    - name: Build with Carton
-      run: swift run carton bundle
-      
-    - name: Deploy to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v3
+# GitHub Pages の「Source: GitHub Actions」用の設定です
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/configure-pages@v5
+    # web/ は HTML/CSS/JS だけで動くので、ビルドせずそのまま公開します
+    - uses: actions/upload-pages-artifact@v3
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./Bundle
+        path: ./web
+    - id: deployment
+      uses: actions/deploy-pages@v4
