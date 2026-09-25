@@ -4,9 +4,9 @@
 
 ## 遊び方
 
-- **公開版**: `main` ブランチに push すると GitHub Actions が `gh-pages` ブランチへ公開します。
-  リポジトリの Settings → Pages で「Branch: `gh-pages` / `(root)`」を選ぶと
-  `https://<ユーザー名>.github.io/MyTetris/` で遊べます。
+- **公開版**: https://yyrtjhgjj-byte.github.io/MyTetris/
+  `main` ブランチに push すると GitHub Actions が自動で公開します
+  （Settings → Pages の Source は「GitHub Actions」）。
 - **手元で**: `web/index.html` をブラウザで開くだけで動きます。
 - iPhone は Safari の共有ボタン →「ホーム画面に追加」で、アプリのように全画面で遊べます。
 
