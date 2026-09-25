@@ -600,6 +600,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
     <div class="set-list">
       <div class="row"><label for="swBgm">BGM</label><button class="switch" role="switch" id="swBgm" data-key="bgm"></button></div>
       <div class="row"><label for="swSound">効果音</label><button class="switch" role="switch" id="swSound" data-key="sound"></button></div>
+      <div class="row"><label for="swSilent">マナーモードでも鳴らす<span class="note">iPhoneの消音スイッチがオンでも音を出します（iOS 16.4以降）</span></label><button class="switch" role="switch" id="swSilent" data-key="silentOk"></button></div>
       <div class="row"><label for="swVibe">振動<span class="note">Androidのみ対応</span></label><button class="switch" role="switch" id="swVibe" data-key="vibe"></button></div>
       <div class="row"><label for="swLite">演出ひかえめ<span class="note">揺れと破片を減らします</span></label><button class="switch" role="switch" id="swLite" data-key="lite"></button></div>
       <div class="row"><label for="swGhost">ゴースト表示<span class="note">落下位置のガイド</span></label><button class="switch" role="switch" id="swGhost" data-key="ghost"></button></div>
@@ -688,7 +689,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
     set(k, v) { try { localStorage.setItem('mytetris.' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
   };
   const CONTROL_DEFAULTS = { ghost: true, gesture: true, lefty: false, das: 167, arr: 33, sdf: 20 };
-  const DEFAULTS = Object.assign({ sound: true, bgm: true, vibe: true, lite: false }, CONTROL_DEFAULTS);
+  const DEFAULTS = Object.assign({ sound: true, bgm: true, silentOk: true, vibe: true, lite: false }, CONTROL_DEFAULTS);
   const S = Object.assign({}, DEFAULTS, store.get('settings', {}));
   const prefs = Object.assign({ level: 1 }, store.get('prefs', {}));
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -838,7 +839,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
         const d = this.noise.getChannelData(0);
         for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
       }
-      if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+      this.session();
+      // iOS leaves the context 'suspended' or 'interrupted' (after a call, app switch
+      // or lock screen); both need resume() from inside a user gesture.
+      if (this.ctx.state !== 'running' && this.ctx.state !== 'closed') this.ctx.resume().catch(() => {});
+    },
+    // iOS 16.4+: 'playback' keeps Web Audio audible with the ringer switch on silent.
+    session() {
+      try { if (navigator.audioSession) navigator.audioSession.type = S.silentOk ? 'playback' : 'ambient'; } catch (e) { /* unsupported */ }
     },
     ok() { return this.ctx && this.ctx.state === 'running'; },
     tone(f, dur, type = 'square', vol = 0.06, to = 0, delay = 0, dest) {
@@ -893,7 +901,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
     },
   };
   const haptic = ms => { if (S.vibe && navigator.vibrate) { try { navigator.vibrate(ms); } catch (e) { /* ignore */ } } };
-  ['pointerdown', 'touchend', 'keydown'].forEach(ev => window.addEventListener(ev, () => Sfx.unlock(), { passive: true }));
+  ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'].forEach(ev => window.addEventListener(ev, () => Sfx.unlock(), { passive: true, capture: true }));
 
   // Korobeiniki (Russian folk song, public domain), as [midi note, eighths].
   const MELODY = [
@@ -907,9 +915,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
   const BASS = [40, 45, 47, 45, 38, 36, 40, 45];
   const Music = {
     on: false, next: 0, step: 0, timer: null, beats: [],
+    // Starts even while the context is still waking up; tick() waits for it to run.
     start() {
-      if (!S.bgm || !Sfx.ok() || this.on) return;
-      this.on = true; this.step = 0; this.next = Sfx.ctx.currentTime + 0.08;
+      if (!S.bgm || !Sfx.ctx || this.on) return;
+      this.on = true; this.step = 0; this.next = 0;
       this.timer = setInterval(() => this.tick(), 25);
     },
     stop() { this.on = false; clearInterval(this.timer); this.timer = null; this.beats.length = 0; },
@@ -917,6 +926,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
     tick() {
       if (!Sfx.ok()) return;
       const ctx = Sfx.ctx, out = Sfx.musGain;
+      // After a stall (suspended context, throttled timer) pick up from now instead of
+      // firing every missed note at once.
+      if (this.next < ctx.currentTime) this.next = ctx.currentTime + 0.05;
       while (this.next < ctx.currentTime + 0.12) {
         const s = this.step, t = this.next - ctx.currentTime, e = 60 / this.bpm() / 2;
         const m = MEL_STEPS[s];
@@ -2158,7 +2170,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { if (playing()) togglePause(); else releaseAll(); }
-    else if (G && !paused && playing()) requestWake();
+    else {
+      if (Sfx.ctx && Sfx.ctx.state !== 'running') Sfx.ctx.resume().catch(() => {});
+      if (G && !paused && playing()) requestWake();
+    }
   });
   window.addEventListener('blur', () => { if (playing()) togglePause(); });
 
@@ -2559,6 +2574,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
     S[sw.dataset.key] = !S[sw.dataset.key];
     applySettings();
     if (sw.dataset.key === 'bgm') { if (!S.bgm) Music.stop(); else if (G && playing()) Music.start(); }
+    if (sw.dataset.key === 'silentOk') Sfx.session();
   }));
   $('rgDas').addEventListener('input', e => { S.das = Number(e.target.value); applySettings(); });
   $('rgArr').addEventListener('input', e => { S.arr = Number(e.target.value); applySettings(); });
@@ -2592,7 +2608,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
   maybeDaily();
 
   // Test hook (read-only view of the running game).
-  window.__tetris = { get G() { return G; }, S, P, input, ROT, KICKS, FX };
+  window.__tetris = { get G() { return G; }, S, P, input, ROT, KICKS, FX, Sfx, Music };
 })();
 </script>
 </body>
