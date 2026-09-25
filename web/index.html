@@ -92,8 +92,33 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
 @keyframes slide { from { background-position: 0 0; } to { background-position: 200% 0; } }
 
 /* ---------- Playfield ---------- */
-.field { display: grid; grid-template-columns: var(--side) minmax(0, 1fr) var(--side); gap: 8px; min-height: 0; }
-.side { display: flex; flex-direction: column; gap: 6px; min-height: 0; padding-top: var(--board-top, 0px); }
+/* Button mode: HOLD/stats on the left, NEXT on the right, pad below. */
+.field {
+  display: grid; gap: 8px; min-height: 0;
+  grid-template-columns: var(--side) minmax(0, 1fr) var(--side);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "hold well next" "stats well next";
+  touch-action: none;
+}
+#holdBox { grid-area: hold; margin-top: var(--board-top, 0px); cursor: pointer; }
+#holdBox.tap { background: var(--panel-2); box-shadow: 0 0 16px rgba(255, 61, 170, .5); }
+#stats { grid-area: stats; display: flex; flex-direction: column; gap: 6px; align-self: start; min-width: 0; }
+#well { grid-area: well; }
+#nextBox { grid-area: next; align-self: start; margin-top: var(--board-top, 0px); }
+/* Gesture mode: no pad; HOLD/stats/NEXT in a tray above a full-width board. */
+#app.gmode .pad { display: none; }
+#app.gmode .field {
+  grid-template-columns: 22% auto minmax(0, 1fr);
+  grid-template-rows: 64px minmax(0, 1fr);
+  grid-template-areas: "hold stats next" "well well well";
+}
+#app.gmode #holdBox, #app.gmode #nextBox { margin-top: 0; align-self: stretch; padding: 3px 4px; }
+#app.gmode #holdBox .lbl, #app.gmode #nextBox .lbl { font-size: 9px; }
+#app.gmode #stats { align-self: center; gap: 3px; width: 64px; }
+#app.gmode .ren { display: flex; align-items: baseline; justify-content: center; gap: 4px; padding: 2px 4px; border-radius: 6px; }
+#app.gmode .ren b { display: inline; font-size: 17px; }
+#app.gmode .ren .lbl { font-size: 9px; }
+#app.gmode .chip, #app.gmode .coin-chip { padding: 1px 2px; font-size: 11px; }
 .box { display: flex; flex-direction: column; gap: 4px; padding: 6px 4px 4px; border-radius: 10px; background: var(--panel); border: 1px solid rgba(255,255,255,.05); }
 .box .lbl { text-align: center; }
 .box canvas { display: block; width: 100%; }
@@ -447,20 +472,18 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
   </header>
   <div class="fever" id="fever"><div class="fever-fill" id="feverFill"></div><div class="fever-lbl" id="feverLbl">FEVER</div></div>
 
-  <main class="field">
-    <aside class="side" id="sideL">
-      <div class="box"><span class="lbl">HOLD</span><canvas id="holdCv"></canvas></div>
+  <main class="field" id="field">
+    <div class="box" id="holdBox" role="button" aria-label="ホールド（タップ）"><span class="lbl">HOLD</span><canvas id="holdCv"></canvas></div>
+    <div id="stats">
       <div class="ren" id="renBox"><b id="renNum">0</b><span class="lbl">REN</span></div>
       <span class="chip" id="chipB2b">B2B</span>
       <div class="coin-chip" id="chipCoin"><span class="coin-ico"></span><span id="gameCoins">0</span></div>
-    </aside>
+    </div>
     <div class="well" id="well">
       <canvas id="boardCv"></canvas>
       <div id="popups"></div>
     </div>
-    <aside class="side" id="sideR">
-      <div class="box"><span class="lbl">NEXT</span><canvas id="nextCv"></canvas></div>
-    </aside>
+    <div class="box" id="nextBox"><span class="lbl">NEXT</span><canvas id="nextCv"></canvas></div>
   </main>
 
   <footer class="pad" id="pad">
@@ -604,8 +627,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
       <div class="row"><label for="swVibe">振動<span class="note">Androidのみ対応</span></label><button class="switch" role="switch" id="swVibe" data-key="vibe"></button></div>
       <div class="row"><label for="swLite">演出ひかえめ<span class="note">揺れと破片を減らします</span></label><button class="switch" role="switch" id="swLite" data-key="lite"></button></div>
       <div class="row"><label for="swGhost">ゴースト表示<span class="note">落下位置のガイド</span></label><button class="switch" role="switch" id="swGhost" data-key="ghost"></button></div>
-      <div class="row"><label for="swGesture">盤面ジェスチャー<span class="note">ドラッグで移動・タップで回転・フリックでドロップ</span></label><button class="switch" role="switch" id="swGesture" data-key="gesture"></button></div>
-      <div class="row"><label for="swLefty">左利きレイアウト<span class="note">移動キーと回転ボタンを左右入れ替え</span></label><button class="switch" role="switch" id="swLefty" data-key="lefty"></button></div>
+      <div class="range">
+        <div class="row"><span>操作方法<span class="note">ジェスチャー: 盤面が大きくなります ／ ボタン: 画面下に操作パッド</span></span></div>
+        <div class="seg" id="segCtl"><button data-v="gesture">ジェスチャー</button><button data-v="pad">ボタン</button></div>
+      </div>
+      <div class="row"><label for="swLefty">左利きレイアウト<span class="note">ボタン操作時、移動キーと回転ボタンを左右入れ替え</span></label><button class="switch" role="switch" id="swLefty" data-key="lefty"></button></div>
     </div>
     <div class="set-list">
       <div class="range">
@@ -631,7 +657,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
     <div class="ov-head"><h2>遊び方</h2><button class="back" id="btnCloseHelp">もどる</button></div>
     <div class="help">
       <section>
-        <h3>ボタン操作</h3>
+        <h3>ボタン操作（設定で切り替え）</h3>
         <dl>
           <dt>◀ ▶</dt><dd>左右に移動（長押しで連続移動）</dd>
           <dt>▼</dt><dd>ソフトドロップ</dd>
@@ -641,13 +667,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
         </dl>
       </section>
       <section>
-        <h3>盤面ジェスチャー</h3>
+        <h3>ジェスチャー操作（標準）</h3>
         <dl>
-          <dt>左右ドラッグ</dt><dd>1マスずつ移動</dd>
-          <dt>下ドラッグ</dt><dd>ソフトドロップ</dd>
-          <dt>下フリック</dt><dd>ハードドロップ</dd>
-          <dt>上フリック</dt><dd>ホールド</dd>
-          <dt>タップ</dt><dd>右回転（左端寄りは左回転）</dd>
+          <dt>左右スワイプ</dt><dd>左右に移動（指についてくる）</dd>
+          <dt>右側をタップ</dt><dd>右回転</dd>
+          <dt>左側をタップ</dt><dd>左回転</dd>
+          <dt>下にドラッグ</dt><dd>指を置いている間ソフトドロップ</dd>
+          <dt>上スワイプ</dt><dd>ハードドロップ</dd>
+          <dt>HOLD枠をタップ</dt><dd>ホールド</dd>
         </dl>
       </section>
       <section>
@@ -688,7 +715,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
     get(k, d) { try { const v = localStorage.getItem('mytetris.' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem('mytetris.' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
   };
-  const CONTROL_DEFAULTS = { ghost: true, gesture: true, lefty: false, das: 167, arr: 33, sdf: 20 };
+  const CONTROL_DEFAULTS = { controls: 'gesture', ghost: true, lefty: false, das: 167, arr: 33, sdf: 20 };
   const DEFAULTS = Object.assign({ sound: true, bgm: true, silentOk: true, vibe: true, lite: false }, CONTROL_DEFAULTS);
   const S = Object.assign({}, DEFAULTS, store.get('settings', {}));
   const prefs = Object.assign({ level: 1 }, store.get('prefs', {}));
@@ -1433,8 +1460,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
   const boardCv = $('boardCv'), bctx = boardCv.getContext('2d');
   const holdCv = $('holdCv'), hctx = holdCv.getContext('2d');
   const nextCv = $('nextCv'), nctx = nextCv.getContext('2d');
-  const sideL = $('sideL'), sideR = $('sideR');
-  let CELL = 20, BW = 200, BH = 400, MINI = 12, HOLD_W = 60, HOLD_H = 40, NEXT_W = 60, NEXT_H = 200;
+  const holdBox = $('holdBox'), nextBox = $('nextBox');
+  const gmode = () => S.controls === 'gesture';
+  let CELL = 20, BW = 200, BH = 400, MINI = 12, HOLD_MINI = 12, HOLD_W = 60, HOLD_H = 40, NEXT_W = 60, NEXT_H = 200;
   const rowY = y => (y - TOP + PEEK) * CELL;
 
   function sizeCanvas(cv, ctx, w, h, dpr = DPR) {
@@ -1447,12 +1475,22 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
     CELL = Math.max(8, Math.floor(Math.min(r.width / COLS, r.height / (VIS + PEEK))));
     BW = CELL * COLS; BH = Math.round(CELL * (VIS + PEEK));
     sizeCanvas(boardCv, bctx, BW, BH);
-    document.documentElement.style.setProperty('--board-top', Math.max(0, Math.floor((r.height - BH) / 2)) + 'px');
-    const inner = sideR.clientWidth - 8;
-    MINI = Math.min(Math.max(6, Math.floor(inner / 4.4)), Math.floor((BH - 30) / (5 * 2.7)));
-    NEXT_W = inner; NEXT_H = Math.round(MINI * 2.7 * 5 + MINI * 0.4);
+    document.documentElement.style.setProperty('--board-top', gmode() ? '0px' : Math.max(0, Math.floor((r.height - BH) / 2)) + 'px');
+    if (gmode()) {
+      // Tray above the board: HOLD on the left, five NEXT pieces in a row.
+      const h = Math.max(20, nextBox.clientHeight - 20);
+      NEXT_W = Math.max(40, nextBox.clientWidth - 8); NEXT_H = h;
+      MINI = Math.max(5, Math.min(Math.floor(h / 2.3), Math.floor(NEXT_W / 5 / 4.4)));
+      HOLD_W = Math.max(30, holdBox.clientWidth - 8); HOLD_H = h;
+      HOLD_MINI = Math.max(5, Math.min(Math.floor(h / 2.3), Math.floor(HOLD_W / 4.4)));
+    } else {
+      const inner = nextBox.clientWidth - 8;
+      MINI = Math.min(Math.max(6, Math.floor(inner / 4.4)), Math.floor((BH - 30) / (5 * 2.7)));
+      NEXT_W = inner; NEXT_H = Math.round(MINI * 2.7 * 5 + MINI * 0.4);
+      HOLD_W = holdBox.clientWidth - 8; HOLD_H = Math.round(MINI * 2.9);
+      HOLD_MINI = MINI;
+    }
     sizeCanvas(nextCv, nctx, NEXT_W, NEXT_H);
-    HOLD_W = sideL.clientWidth - 8; HOLD_H = Math.round(MINI * 2.9);
     sizeCanvas(holdCv, hctx, HOLD_W, HOLD_H);
     sizeCanvas(fxCv, fctx, innerWidth, innerHeight, Math.min(DPR, 2));
     sizeCanvas(bgCv, bgctx, innerWidth, innerHeight, 1);
@@ -1529,14 +1567,19 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
   function renderSides() {
     if (!G) { if (sideKey) { hctx.clearRect(0, 0, HOLD_W, HOLD_H); nctx.clearRect(0, 0, NEXT_W, NEXT_H); } sideKey = ''; return; }
     const anim = ANIMATED[P.equip.skin] || G.queue.slice(0, 5).some(q => q.gold >= 0) || (G.hold && G.hold.gold >= 0);
-    const key = [G.hold && G.hold.t, G.holdUsed, G.queue.slice(0, 5).map(q => q.t + q.gold).join(''), MINI, HOLD_W, G.state === 'over'].join('|');
+    const key = [G.hold && G.hold.t, G.holdUsed, G.queue.slice(0, 5).map(q => q.t + q.gold).join(''), MINI, HOLD_W, NEXT_W, S.controls, G.state === 'over'].join('|');
     if (key === sideKey && !anim) return;
     sideKey = key;
     hctx.clearRect(0, 0, HOLD_W, HOLD_H);
-    if (G.hold) drawMini(hctx, G.hold.t, G.hold.gold, HOLD_W / 2, HOLD_H / 2, MINI, G.holdUsed);
+    if (G.hold) drawMini(hctx, G.hold.t, G.hold.gold, HOLD_W / 2, HOLD_H / 2, HOLD_MINI, G.holdUsed);
     nctx.clearRect(0, 0, NEXT_W, NEXT_H);
-    const slot = MINI * 2.7;
-    G.queue.slice(0, 5).forEach((q, i) => drawMini(nctx, q.t, q.gold, NEXT_W / 2, MINI * 0.2 + slot * i + slot / 2, MINI, false));
+    if (gmode()) {
+      const slot = NEXT_W / 5;
+      G.queue.slice(0, 5).forEach((q, i) => drawMini(nctx, q.t, q.gold, slot * i + slot / 2, NEXT_H / 2, MINI, false));
+    } else {
+      const slot = MINI * 2.7;
+      G.queue.slice(0, 5).forEach((q, i) => drawMini(nctx, q.t, q.gold, NEXT_W / 2, MINI * 0.2 + slot * i + slot / 2, MINI, false));
+    }
   }
 
   // ================= Effects =================
@@ -2054,42 +2097,58 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
   dpad.addEventListener('lostpointercapture', e => { if (e.pointerId === dp.id) { setZone(null); dp.id = null; } });
   $('pad').addEventListener('contextmenu', e => e.preventDefault());
 
+  // Touch gestures. Each touch locks to one axis once it has moved ~10px:
+  //   sideways  -> move one cell per step, following the finger
+  //   down      -> soft drop while the finger stays down there
+  //   up        -> hard drop (fires as soon as the swipe is long enough)
+  //   no motion -> tap: right half rotates right, left half rotates left
+  // In gesture mode the whole play area listens; in button mode only the board.
   let gs = null;
-  well.addEventListener('pointerdown', e => {
-    if (!S.gesture || !playing()) return;
+  const field = $('field');
+  field.addEventListener('pointerdown', e => {
+    if (!playing() || e.target.closest('#holdBox')) return;
+    if (!gmode() && !e.target.closest('#well')) return;
     e.preventDefault();
-    try { well.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
-    gs = { id: e.pointerId, x0: e.clientX, y0: e.clientY, ax: e.clientX, ay: e.clientY, t0: now(), moved: false, samples: [{ t: now(), y: e.clientY }] };
+    try { field.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    input.soft = false;
+    gs = { id: e.pointerId, x0: e.clientX, y0: e.clientY, ax: e.clientX, t0: now(), axis: null, done: false };
   });
-  well.addEventListener('pointermove', e => {
-    if (!gs || e.pointerId !== gs.id) return;
-    const step = CELL * 0.9;
-    let dx = e.clientX - gs.ax;
-    while (Math.abs(dx) >= step) { const d = Math.sign(dx); tryMove(d, 0); gs.ax += d * step; dx -= d * step; gs.moved = true; }
-    const dy = e.clientY - gs.ay;
-    if (dy >= CELL && Math.abs(e.clientX - gs.x0) < Math.abs(e.clientY - gs.y0) * 1.2) {
-      const n = Math.floor(dy / CELL);
-      for (let i = 0; i < n; i++) if (tryMove(0, 1)) G.score += 1;
-      gs.ay += n * CELL; gs.moved = true;
-    } else if (dy < 0 && -dy > CELL) gs.ay = e.clientY - CELL;
-    const t = now();
-    gs.samples.push({ t, y: e.clientY });
-    while (gs.samples.length > 2 && t - gs.samples[0].t > 90) gs.samples.shift();
+  field.addEventListener('pointermove', e => {
+    if (!gs || e.pointerId !== gs.id || gs.done) return;
+    const dx = e.clientX - gs.x0, dy = e.clientY - gs.y0;
+    if (!gs.axis) {
+      if (Math.hypot(dx, dy) < 10) return;
+      gs.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    }
+    if (gs.axis === 'x') {
+      const step = Math.max(16, CELL * 0.8);
+      let d = e.clientX - gs.ax;
+      while (Math.abs(d) >= step) { const s = Math.sign(d); tryMove(s, 0); gs.ax += s * step; d -= s * step; }
+    } else if (dy <= -Math.max(24, CELL * 1.2)) {
+      input.soft = false;
+      gs.done = true;
+      hardDrop();
+    } else if (dy >= Math.max(16, CELL * 0.8)) {
+      if (!input.soft && G && G.state === 'play') { input.soft = true; if (tryMove(0, 1)) { G.score += 1; G.gravAcc = 0; } }
+    } else {
+      input.soft = false;
+    }
   });
   function gsEnd(e) {
     if (!gs || e.pointerId !== gs.id) return;
-    const t = now(), totalDy = e.clientY - gs.y0, totalDx = e.clientX - gs.x0, s0 = gs.samples[0];
-    const vy = (e.clientY - s0.y) / Math.max(16, t - s0.t);
-    if (e.type === 'pointerup') {
-      if (vy > 0.9 && totalDy > CELL * 1.5) hardDrop();
-      else if (vy < -0.7 && totalDy < -CELL * 1.5) doHold();
-      else if (!gs.moved && Math.hypot(totalDx, totalDy) < 12 && t - gs.t0 < 350) {
-        const r = boardCv.getBoundingClientRect();
-        rotate(e.clientX < r.left + r.width * 0.25 ? -1 : 1);
-      }
+    if (e.type === 'pointerup' && !gs.axis && !gs.done && now() - gs.t0 < 350) {
+      const r = boardCv.getBoundingClientRect();
+      rotate(e.clientX < r.left + r.width / 2 ? -1 : 1);
     }
+    input.soft = false;
     gs = null;
   }
+  holdBox.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    if (!playing()) return;
+    doHold(); haptic(8);
+    holdBox.classList.add('tap'); setTimeout(() => holdBox.classList.remove('tap'), 120);
+  });
 
   // ================= Screens =================
   const OVS = ['ovTitle', 'ovPause', 'ovResult', 'ovSettings', 'ovHelp', 'ovGacha', 'ovCol', 'ovAch', 'ovDaily'];
@@ -2567,9 +2626,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
     $('oDas').textContent = S.das + ' ms';
     $('oArr').textContent = S.arr === 0 ? '0 ms（瞬時）' : S.arr + ' ms';
     document.querySelectorAll('#segSdf button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.v) === S.sdf)));
+    document.querySelectorAll('#segCtl button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === S.controls)));
     pad.classList.toggle('lefty', S.lefty);
+    const was = app.classList.contains('gmode');
+    app.classList.toggle('gmode', gmode());
+    if (was !== gmode()) { layout(); sideKey = ''; }
     store.set('settings', S);
   }
+  document.querySelectorAll('#segCtl button').forEach(b => b.addEventListener('click', () => { S.controls = b.dataset.v; releaseAll(); applySettings(); }));
   document.querySelectorAll('.switch').forEach(sw => sw.addEventListener('click', () => {
     S[sw.dataset.key] = !S[sw.dataset.key];
     applySettings();
