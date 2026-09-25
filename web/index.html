@@ -651,7 +651,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
       </section>
       <section>
         <h3>FEVER</h3>
-        <p>ラインを消すとゲージがたまります。テトリスやT-Spin、RENを決めるほど一気にたまり、満タンになると10秒間スコア2倍のFEVERに突入します。</p>
+        <p>ラインを消すとゲージがたまります。テトリスやT-Spin、RENを決めるほど一気にたまり、満タンになるとFEVERに突入。そこから6回ラインを消すまでスコア2倍です（1列でも4列でも1回）。FEVER中にテトリスを狙うほどお得です。</p>
       </section>
       <section>
         <h3>ラッキーブロック</h3>
@@ -770,7 +770,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
   // ================= Tetromino data =================
   const COLS = 10, ROWS = 40, VIS = 20, TOP = ROWS - VIS, PEEK = 0.6;
   const LOCK_DELAY = 500, MAX_RESETS = 15, CLEAR_DELAY = 320, READY_TIME = 1800, MAX_LEVEL = 20;
-  const FEVER_TIME = 10000, LUCKY_CHANCE = 0.12;
+  const FEVER_CLEARS = 6, LUCKY_CHANCE = 0.12;
   const COLORS = { I: '#3ED6F0', O: '#F7D23E', T: '#B25CF0', S: '#52D66A', Z: '#F0525E', J: '#4A7CF5', L: '#F59A3A', G: '#4B4775' };
   const GOLD = '#FFD54A';
   const MODES = {
@@ -1161,8 +1161,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
       else if (tier >= 3) FX.confetti(tier >= 4 ? 110 : 60);
     }
 
-    // Fever gauge.
-    if (n && G.fever <= 0) {
+    // Fever gauge. During FEVER each line-clearing move uses up one charge.
+    if (n && G.fever > 0) {
+      G.fever--;
+      G.gauge = 100 * G.fever / FEVER_CLEARS;
+      if (G.fever <= 0) { G.fever = 0; G.gauge = 0; setTimeout(() => { if (G) popup([{ sub: 'FEVER END' }], 0); }, 500); }
+    } else if (n) {
       let gain = [0, 8, 16, 26, 40][n] + (spin ? 25 : 0) + Math.max(0, G.combo) * 4 + (b2bHit ? 10 : 0) + (pc ? 100 : 0);
       G.gauge = Math.min(100, G.gauge + gain);
       if (G.gauge >= 100) startFever();
@@ -1180,12 +1184,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
   }
 
   function startFever() {
-    G.fever = FEVER_TIME;
+    G.fever = FEVER_CLEARS;
     G.gauge = 100;
     G.stats.fevers++;
     Sfx.fever();
     haptic([30, 40, 30, 40, 60]);
-    setTimeout(() => { if (G) popup([{ big: 'FEVER!!' }, { sub: '10秒間 スコア2倍' }], 4); }, 150);
+    setTimeout(() => { if (G) popup([{ big: 'FEVER!!' }, { sub: `${FEVER_CLEARS}回消すまで スコア2倍` }], 4); }, 150);
     FX.confetti(90);
     FX.flash(0.35);
   }
@@ -1234,11 +1238,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
   function update(dt) {
     if (!G || paused) return;
     const mode = MODES[G.mode];
-    if (G.fever > 0 && (G.state === 'play' || G.state === 'clear')) {
-      G.fever -= dt;
-      G.gauge = Math.max(0, 100 * G.fever / FEVER_TIME);
-      if (G.fever <= 0) { G.fever = 0; G.gauge = 0; popup([{ sub: 'FEVER END' }], 0); }
-    }
     switch (G.state) {
       case 'ready': {
         handleDas(dt);
@@ -1924,7 +1923,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
     const fv = !!(G && G.fever > 0);
     if (fv !== feverOn || force) { feverOn = fv; app.classList.toggle('on-fever', fv); }
     feverBox.classList.toggle('full', !fv && gauge >= 80);
-    const fl = fv ? `FEVER ×2 ・ ${Math.ceil(G.fever / 1000)}` : gauge >= 80 ? 'FEVER まもなく!' : 'FEVER';
+    const fl = fv ? `FEVER ×2 ・ あと${G.fever}回` : gauge >= 80 ? 'FEVER まもなく!' : 'FEVER';
     if (feverLbl.textContent !== fl) feverLbl.textContent = fl;
     const lvl = G ? G.level : 1;
     if (lvl !== lastLevel) {
@@ -1969,7 +1968,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
   function releaseAll() {
     input.left = input.right = false; input.dir = 0; input.das = 0; input.soft = false;
     document.querySelectorAll('.down').forEach(el => el.classList.remove('down'));
+    btnPid.clear();
     dp.zone = null; dp.id = null;
+    gs = null;
   }
   const KEYMAP = { ArrowLeft: 'left', ArrowRight: 'right', ArrowDown: 'soft', ' ': 'hard', ArrowUp: 'cw', x: 'cw', X: 'cw', z: 'ccw', Z: 'ccw', Control: 'ccw', c: 'hold', C: 'hold', Shift: 'hold' };
   window.addEventListener('keydown', e => {
@@ -1982,20 +1983,34 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
   });
   window.addEventListener('keyup', e => { const a = KEYMAP[e.key]; if (a) actUp(a); });
 
+  // Which pointer is holding each button. The browser sometimes never delivers
+  // pointerup to the button (multi-touch, a finger sliding off, lost capture),
+  // so a new press always takes over and any pointer release anywhere ends it.
+  const btnPid = new Map();
+  function btnUp(btn) {
+    if (!btnPid.has(btn)) return;
+    btnPid.delete(btn);
+    btn.classList.remove('down');
+    actUp(btn.dataset.act);
+  }
   document.querySelectorAll('[data-act]').forEach(btn => {
-    let pid = null;
     btn.addEventListener('pointerdown', e => {
       e.preventDefault();
-      if (pid !== null) return;
-      pid = e.pointerId;
+      if (btnPid.has(btn)) btnUp(btn);
+      btnPid.set(btn, e.pointerId);
       try { btn.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
       btn.classList.add('down'); haptic(8);
       actDown(btn.dataset.act);
     });
-    const up = e => { if (e.pointerId !== pid) return; pid = null; btn.classList.remove('down'); actUp(btn.dataset.act); };
-    btn.addEventListener('pointerup', up);
-    btn.addEventListener('pointercancel', up);
+    btn.addEventListener('lostpointercapture', e => { if (btnPid.get(btn) === e.pointerId) btnUp(btn); });
   });
+  function pointerGone(e) {
+    for (const [btn, id] of btnPid) if (id === e.pointerId) btnUp(btn);
+    if (dp.id === e.pointerId) { setZone(null); dp.id = null; }
+    if (gs && gs.id === e.pointerId) gsEnd(e);
+  }
+  window.addEventListener('pointerup', pointerGone, true);
+  window.addEventListener('pointercancel', pointerGone, true);
 
   const dpad = $('dpad');
   const dp = { id: null, zone: null };
@@ -2014,7 +2029,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
   }
   dpad.addEventListener('pointerdown', e => {
     e.preventDefault();
-    if (dp.id !== null) return;
+    if (dp.id !== null) setZone(null);
     dp.id = e.pointerId;
     try { dpad.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     setZone(zoneAt(e));
@@ -2024,14 +2039,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
     const z = zoneAt(e);
     if (z && z !== dp.zone && z !== 'hard') setZone(z);
   });
-  const dpEnd = e => { if (e.pointerId !== dp.id) return; setZone(null); dp.id = null; };
-  dpad.addEventListener('pointerup', dpEnd);
-  dpad.addEventListener('pointercancel', dpEnd);
+  dpad.addEventListener('lostpointercapture', e => { if (e.pointerId === dp.id) { setZone(null); dp.id = null; } });
   $('pad').addEventListener('contextmenu', e => e.preventDefault());
 
   let gs = null;
   well.addEventListener('pointerdown', e => {
-    if (!S.gesture || !playing() || gs) return;
+    if (!S.gesture || !playing()) return;
     e.preventDefault();
     try { well.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     gs = { id: e.pointerId, x0: e.clientX, y0: e.clientY, ax: e.clientX, ay: e.clientY, t0: now(), moved: false, samples: [{ t: now(), y: e.clientY }] };
@@ -2051,7 +2064,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
     gs.samples.push({ t, y: e.clientY });
     while (gs.samples.length > 2 && t - gs.samples[0].t > 90) gs.samples.shift();
   });
-  const gsEnd = e => {
+  function gsEnd(e) {
     if (!gs || e.pointerId !== gs.id) return;
     const t = now(), totalDy = e.clientY - gs.y0, totalDx = e.clientX - gs.x0, s0 = gs.samples[0];
     const vy = (e.clientY - s0.y) / Math.max(16, t - s0.t);
@@ -2064,9 +2077,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
       }
     }
     gs = null;
-  };
-  well.addEventListener('pointerup', gsEnd);
-  well.addEventListener('pointercancel', gsEnd);
+  }
 
   // ================= Screens =================
   const OVS = ['ovTitle', 'ovPause', 'ovResult', 'ovSettings', 'ovHelp', 'ovGacha', 'ovCol', 'ovAch', 'ovDaily'];
