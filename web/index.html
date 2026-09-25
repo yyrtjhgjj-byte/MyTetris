@@ -673,8 +673,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
           <dt>右側をタップ</dt><dd>右回転</dd>
           <dt>左側をタップ</dt><dd>左回転</dd>
           <dt>下にドラッグ</dt><dd>指を置いている間ソフトドロップ</dd>
-          <dt>上スワイプ</dt><dd>ハードドロップ</dd>
-          <dt>HOLD枠をタップ</dt><dd>ホールド</dd>
+          <dt>下にフリック</dt><dd>ハードドロップ（素早く払う）</dd>
+          <dt>上スワイプ</dt><dd>ホールド（HOLD枠のタップでもOK）</dd>
         </dl>
       </section>
       <section>
@@ -2099,9 +2099,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
 
   // Touch gestures. Each touch locks to one axis once it has moved ~10px:
   //   sideways  -> move one cell per step, following the finger
-  //   down      -> soft drop while the finger stays down there
-  //   up        -> hard drop (fires as soon as the swipe is long enough)
-  //   no motion -> tap: right half rotates right, left half rotates left
+  //   down, slow -> soft drop while the finger stays down there
+  //   down, flick -> hard drop (judged on release from the finger's speed)
+  //   up          -> hold (fires as soon as the swipe is long enough)
+  //   no motion   -> tap: right half rotates right, left half rotates left
   // In gesture mode the whole play area listens; in button mode only the board.
   let gs = null;
   const field = $('field');
@@ -2111,11 +2112,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
     e.preventDefault();
     try { field.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
     input.soft = false;
-    gs = { id: e.pointerId, x0: e.clientX, y0: e.clientY, ax: e.clientX, t0: now(), axis: null, done: false };
+    gs = { id: e.pointerId, x0: e.clientX, y0: e.clientY, ax: e.clientX, t0: now(), axis: null, done: false, samples: [{ t: now(), y: e.clientY }] };
   });
+  const FLICK_MS = 140;
   field.addEventListener('pointermove', e => {
     if (!gs || e.pointerId !== gs.id || gs.done) return;
-    const dx = e.clientX - gs.x0, dy = e.clientY - gs.y0;
+    const dx = e.clientX - gs.x0, dy = e.clientY - gs.y0, t = now();
+    gs.samples.push({ t, y: e.clientY });
+    while (gs.samples.length > 2 && t - gs.samples[0].t > 80) gs.samples.shift();
     if (!gs.axis) {
       if (Math.hypot(dx, dy) < 10) return;
       gs.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
@@ -2127,18 +2131,30 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
     } else if (dy <= -Math.max(24, CELL * 1.2)) {
       input.soft = false;
       gs.done = true;
-      hardDrop();
+      doHold();
     } else if (dy >= Math.max(16, CELL * 0.8)) {
-      if (!input.soft && G && G.state === 'play') { input.soft = true; if (tryMove(0, 1)) { G.score += 1; G.gravAcc = 0; } }
+      // Wait a moment before soft dropping so a quick flick stays a clean hard drop.
+      if (!input.soft && t - gs.t0 >= FLICK_MS && G && G.state === 'play') { input.soft = true; if (tryMove(0, 1)) { G.score += 1; G.gravAcc = 0; } }
     } else {
       input.soft = false;
     }
   });
   function gsEnd(e) {
     if (!gs || e.pointerId !== gs.id) return;
-    if (e.type === 'pointerup' && !gs.axis && !gs.done && now() - gs.t0 < 350) {
-      const r = boardCv.getBoundingClientRect();
-      rotate(e.clientX < r.left + r.width / 2 ? -1 : 1);
+    const t = now(), dx = e.clientX - gs.x0, dy = e.clientY - gs.y0;
+    // A very fast swipe may deliver no pointermove at all, so settle the axis here too.
+    if (!gs.axis && Math.hypot(dx, dy) >= 10) gs.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+    if (e.type === 'pointerup' && !gs.done) {
+      const s0 = gs.samples[0];
+      const vy = (e.clientY - s0.y) / Math.max(16, t - s0.t);
+      if (!gs.axis) {
+        if (t - gs.t0 < 350) { const r = boardCv.getBoundingClientRect(); rotate(e.clientX < r.left + r.width / 2 ? -1 : 1); }
+      } else if (gs.axis === 'y' && dy >= Math.max(20, CELL) && (vy > 0.5 || t - gs.t0 < FLICK_MS)) {
+        input.soft = false;
+        hardDrop();
+      } else if (gs.axis === 'y' && dy <= -Math.max(24, CELL * 1.2)) {
+        doHold();
+      }
     }
     input.soft = false;
     gs = null;
