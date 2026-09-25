@@ -307,6 +307,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
 .nav .gacha-btn { border-color: rgba(255, 213, 74, .6); background: linear-gradient(160deg, rgba(255, 176, 32, .35), rgba(255, 61, 170, .3)); }
 .nav .gacha-btn svg { fill: var(--gold); }
 .badge { position: absolute; top: -6px; right: -4px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--hot); color: #fff; font-family: var(--font-num); font-size: 11px; font-weight: 700; display: grid; place-items: center; box-shadow: 0 0 10px rgba(255, 61, 170, .8); animation: throb .7s ease-in-out infinite alternate; }
+.ver { margin: -8px 0 0; text-align: center; font-family: var(--font-num); font-size: 10px; letter-spacing: .1em; color: var(--muted); opacity: .7; }
 .linkbtn { background: none; border: 0; color: var(--muted); text-decoration: underline; cursor: pointer; font-size: 13px; padding: 6px; }
 .btns { display: flex; gap: 8px; }
 .btns > button { flex: 1; }
@@ -534,6 +535,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
       <button id="navSet"><svg viewBox="0 0 24 24"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg>設定</button>
     </nav>
     <button class="linkbtn" id="btnHelp">遊び方・得点のしくみ</button>
+    <p class="ver" id="ver"></p>
   </section>
 
   <!-- Pause -->
@@ -709,6 +711,24 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
 (() => {
   'use strict';
   const $ = id => document.getElementById(id);
+
+  // Bump on every release. On the hosted site the page checks for a newer copy
+  // at startup and reloads into it, because phones (and home-screen web apps)
+  // keep serving a cached page for a while after a deploy.
+  const BUILD = '2026.09.25-6';
+  (function checkForUpdate() {
+    if (!/github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname)) return;
+    fetch(location.pathname + '?check=' + Date.now(), { cache: 'no-store' })
+      .then(r => r.ok ? r.text() : '')
+      .then(t => {
+        const m = t.match(/const BUILD = '([^']+)'/);
+        const url = new URL(location.href);
+        if (!m || m[1] === BUILD || url.searchParams.get('v') === m[1]) return;
+        url.searchParams.set('v', m[1]);
+        location.replace(url.href);
+      })
+      .catch(() => {});
+  })();
 
   // ================= Storage =================
   const store = {
@@ -2677,6 +2697,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
   document.addEventListener('dblclick', e => e.preventDefault());
 
   // ================= Boot =================
+  $('ver').textContent = 'ver ' + BUILD;
   applySettings();
   buildModes();
   refreshProfile();
